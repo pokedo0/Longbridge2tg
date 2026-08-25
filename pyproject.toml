@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "longbridge2tg"
+version = "0.1.0"
+description = "Send Longbridge stock positions to Telegram on a schedule"
+requires-python = ">=3.11"
+dependencies = [
+  "aiogram>=3.30.0,<4",
+  "APScheduler>=3.10,<4",
+  "longbridge==4.5.0",
+  "PyYAML>=6,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[project.scripts]
+longbridge2tg = "longbridge2tg.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/longbridge2tg"]

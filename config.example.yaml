@@ -1,0 +1,15 @@
+longbridge:
+  app_key: "your_app_key"
+  app_secret: "your_app_secret"
+  access_token: "your_access_token"
+
+telegram:
+  bot_token: "your_bot_token"
+  chat_id: 123456789
+
+schedule:
+  times:
+    - "09:30"
+    - "20:00"
+
+log_level: "INFO"

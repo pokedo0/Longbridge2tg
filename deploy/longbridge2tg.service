@@ -1,0 +1,23 @@
+[Unit]
+Description=Longbridge stock position Telegram reporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=longbridge2tg
+Group=longbridge2tg
+WorkingDirectory=/opt/longbridge2tg
+Environment=LB2TG_CONFIG=/etc/longbridge2tg/config.yaml
+ExecStart=/opt/longbridge2tg/.venv/bin/python -m longbridge2tg --config /etc/longbridge2tg/config.yaml
+Restart=always
+RestartSec=5
+
+# Minimal hardening for a service that only needs its config and network.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
