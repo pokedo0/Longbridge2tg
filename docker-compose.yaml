@@ -9,4 +9,5 @@ services:
     environment:
       TZ: Asia/Shanghai
     volumes:
-      - /etc/longbridge2tg/config.yaml:/etc/longbridge2tg/config.yaml:ro
+      # 配置文件放在本文件同目录下
+      - ./config.yaml:/etc/longbridge2tg/config.yaml:ro

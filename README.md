@@ -74,10 +74,9 @@ longbridge SDK 的 Linux 包要求 glibc >= 2.39（Debian 13 / Ubuntu 24.04+）�
 
 ```bash
 sudo apt update && sudo apt install -y docker.io docker-compose-plugin
-sudo mkdir -p /etc/longbridge2tg
-sudo cp config.example.yaml /etc/longbridge2tg/config.yaml
-sudo nano /etc/longbridge2tg/config.yaml   # 填入密钥
-sudo chmod 600 /etc/longbridge2tg/config.yaml
+cp config.example.yaml config.yaml
+nano config.yaml   # 填入密钥
+chmod 600 config.yaml
 
 # 方式一：直接拉取 GHCR 镜像
 curl -o docker-compose.yaml https://raw.githubusercontent.com/pokedo0/Longbridge2tg/master/docker-compose.yaml
