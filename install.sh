@@ -25,6 +25,16 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
+# longbridge SDK 的 Linux wheel 要求 glibc >= 2.39（Debian 13 / Ubuntu 24.04+）。
+GLIBC_VERSION=$(ldd --version | head -1 | awk '{for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+GLIBC_MAJOR=${GLIBC_VERSION%%.*}
+GLIBC_MINOR=${GLIBC_VERSION##*.}
+if [ -z "${GLIBC_VERSION}" ] || [ "${GLIBC_MAJOR}" -lt 2 ] || { [ "${GLIBC_MAJOR}" -eq 2 ] && [ "${GLIBC_MINOR}" -lt 39 ]; }; then
+    echo "当前 glibc 版本为 ${GLIBC_VERSION:-未知}，过低（需要 >= 2.39，longbridge SDK 限制）。"
+    echo "请改用 Docker 部署，步骤见 README.md 的 Docker 部署一节。"
+    exit 1
+fi
+
 if [ ! -f "${APP_DIR}/config.yaml" ] && [ ! -f "${CONFIG_FILE}" ]; then
     echo "警告: 未找到配置文件。"
     echo "请复制 config.example.yaml 为 config.yaml 并填好后重新运行，或稍后手动放到 ${CONFIG_FILE}"

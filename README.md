@@ -68,6 +68,27 @@ python -m longbridge2tg --config ./config.yaml
 
 ## VPS 部署
 
+### Docker 部署（推荐，兼容 Debian 12 等旧 glibc 系统）
+
+longbridge SDK 的 Linux 包要求 glibc >= 2.39（Debian 13 / Ubuntu 24.04+）。Debian 12 请用 Docker：
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin
+sudo mkdir -p /etc/longbridge2tg
+sudo cp config.example.yaml /etc/longbridge2tg/config.yaml
+sudo nano /etc/longbridge2tg/config.yaml   # 填入密钥
+sudo chmod 600 /etc/longbridge2tg/config.yaml
+
+# 方式一：直接拉取 GHCR 镜像
+curl -o docker-compose.yaml https://raw.githubusercontent.com/pokedo0/Longbridge2tg/master/docker-compose.yaml
+sudo docker compose up -d
+sudo docker compose logs -f
+```
+
+镜像由 GitHub Actions 自动构建并推送到 `ghcr.io/pokedo0/longbridge2tg`；推送 master 或打 `v*` tag 时触发。
+
+### 原生部署（需要 Debian 13 / Ubuntu 24.04+）
+
 参考 [deploy/longbridge2tg.service](deploy/longbridge2tg.service)。常见安装路径如下：
 
 Debian/Ubuntu 上可以一键安装（创建 venv、装依赖、生成并启用 systemd 服务）：

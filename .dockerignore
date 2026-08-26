@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+data
+tests
+deploy
+config.yaml
+config.example.yaml

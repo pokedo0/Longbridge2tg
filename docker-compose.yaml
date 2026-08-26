@@ -1,0 +1,12 @@
+services:
+  longbridge2tg:
+    #    build: .
+    image: ghcr.io/pokedo0/longbridge2tg:latest
+    pull_policy: always
+    container_name: longbridge2tg
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - /etc/longbridge2tg/config.yaml:/etc/longbridge2tg/config.yaml:ro
