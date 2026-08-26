@@ -31,6 +31,10 @@ class ReportService:
         self.client = client
         self.sender = sender
 
+    def set_sender(self, sender: TelegramSender) -> None:
+        logger.info("switching telegram sender session")
+        self.sender = sender
+
     async def run(self, trigger: str) -> bool:
         logger.info("running portfolio report: trigger=%s", trigger)
         try:

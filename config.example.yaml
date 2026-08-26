@@ -9,7 +9,8 @@ telegram:
 
 schedule:
   times:
-    - "09:30"
-    - "20:00"
+    - "14:00"
+    - "18:00"
+    - "21:00"
 
 log_level: "INFO"

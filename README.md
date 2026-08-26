@@ -70,6 +70,12 @@ python -m longbridge2tg --config ./config.yaml
 
 参考 [deploy/longbridge2tg.service](deploy/longbridge2tg.service)。常见安装路径如下：
 
+Debian/Ubuntu 上可以一键安装（创建 venv、装依赖、生成并启用 systemd 服务）：
+
+```bash
+sudo bash install.sh
+```
+
 ```bash
 sudo mkdir -p /etc/longbridge2tg /opt/longbridge2tg
 sudo cp config.example.yaml /etc/longbridge2tg/config.yaml
