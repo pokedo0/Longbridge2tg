@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
@@ -38,11 +39,12 @@ class LongbridgePositionsClient:
                 self._config.app_secret,
                 self._config.access_token,
                 language=Language.ZH_CN,
+                enable_overnight=True,
             )
             loop = asyncio.get_running_loop()
             self._context = AsyncTradeContext.create(sdk_config, loop_=loop)
             self._quote_context = AsyncQuoteContext.create(sdk_config, loop_=loop)
-            logger.info("initialized Longbridge trade and quote contexts")
+            logger.info("initialized Longbridge trade and quote contexts (enable_overnight=True)")
 
     async def get_portfolio_snapshot(self) -> PortfolioSnapshot:
         await self.start()
@@ -84,6 +86,7 @@ class LongbridgePositionsClient:
         logger.info("fetching security details: symbols=%d", len(symbols))
         static_names: dict[str, str] = {}
         quotes: dict[str, Decimal] = {}
+        session_counts: dict[str, int] = {}
 
         for offset in range(0, len(symbols), _QUOTE_BATCH_SIZE):
             batch = symbols[offset : offset + _QUOTE_BATCH_SIZE]
@@ -94,7 +97,10 @@ class LongbridgePositionsClient:
             for item in static_response:
                 static_names[str(item.symbol)] = str(item.name_cn or item.name_en or "")
             for item in quote_response:
-                quotes[str(item.symbol)] = _decimal(item.last_done)
+                symbol = str(item.symbol)
+                price, session_name = _extract_realtime_price(item)
+                quotes[symbol] = price
+                session_counts[session_name] = session_counts.get(session_name, 0) + 1
 
         missing_static = {symbol for symbol in symbols if symbol not in static_names}
         missing_quotes = {symbol for symbol in symbols if symbol not in quotes}
@@ -108,7 +114,86 @@ class LongbridgePositionsClient:
                 "security static names unavailable, will use position names: %s",
                 ", ".join(sorted(missing_static)),
             )
+
+        logger.info(
+            "resolved realtime quotes for %d symbols (session breakdown: %s)",
+            len(quotes),
+            ", ".join(f"{k}={v}" for k, v in sorted(session_counts.items())),
+        )
         return static_names, quotes
+
+
+def _timestamp_to_epoch(ts: object) -> float:
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, datetime):
+        return ts.timestamp()
+    if isinstance(ts, str):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _extract_realtime_price(quote_item: object) -> tuple[Decimal, str]:
+    """
+    Extract the most recent traded price across regular, pre-market,
+    post-market, and overnight sessions.
+
+    Returns (price, session_name).
+    """
+    symbol = str(getattr(quote_item, "symbol", ""))
+    candidates: list[tuple[float, int, Decimal, str]] = []
+
+    last_done = getattr(quote_item, "last_done", None)
+    if last_done is not None:
+        try:
+            val = _decimal(last_done)
+            if val > 0:
+                ts = _timestamp_to_epoch(getattr(quote_item, "timestamp", None))
+                candidates.append((ts, 0, val, "regular"))
+        except (ValueError, TypeError):
+            pass
+
+    session_defs = (
+        ("pre_market_quote", 1),
+        ("post_market_quote", 2),
+        ("overnight_quote", 3),
+    )
+    for attr_name, priority in session_defs:
+        sub_quote = getattr(quote_item, attr_name, None)
+        if sub_quote is None:
+            continue
+        sub_last = getattr(sub_quote, "last_done", None)
+        if sub_last is None:
+            continue
+        try:
+            sub_val = _decimal(sub_last)
+            if sub_val > 0:
+                sub_ts = _timestamp_to_epoch(getattr(sub_quote, "timestamp", None))
+                candidates.append((sub_ts, priority, sub_val, attr_name))
+        except (ValueError, TypeError):
+            pass
+
+    if not candidates:
+        fallback = _decimal(last_done) if last_done is not None else Decimal(0)
+        return fallback, "regular"
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    selected_ts, _, selected_price, selected_session = candidates[-1]
+
+    if selected_session != "regular":
+        logger.debug(
+            "symbol %s selected %s price %s (ts=%s) over regular last_done %s",
+            symbol,
+            selected_session,
+            selected_price,
+            selected_ts,
+            last_done,
+        )
+
+    return selected_price, selected_session
 
 
 def _normalize_positions(

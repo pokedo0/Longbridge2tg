@@ -125,3 +125,76 @@ def test_select_balance_fallback_single_balance():
     assert summary is not None
     assert summary.currency == "USD"
     assert summary.net_assets == Decimal("20000")
+
+
+def test_extract_realtime_price_picks_overnight_when_newer():
+    from datetime import datetime, timedelta
+    from longbridge2tg.longbridge_client import _extract_realtime_price
+
+    now = datetime.now()
+    quote = SimpleNamespace(
+        symbol="AAPL.US",
+        last_done=Decimal("100"),
+        timestamp=now - timedelta(hours=8),
+        overnight_quote=SimpleNamespace(last_done=Decimal("105"), timestamp=now),
+        pre_market_quote=None,
+        post_market_quote=None,
+    )
+    price, session = _extract_realtime_price(quote)
+    assert price == Decimal("105")
+    assert session == "overnight_quote"
+
+
+def test_extract_realtime_price_picks_regular_when_overnight_stale():
+    from datetime import datetime, timedelta
+    from longbridge2tg.longbridge_client import _extract_realtime_price
+
+    now = datetime.now()
+    quote = SimpleNamespace(
+        symbol="AAPL.US",
+        last_done=Decimal("100"),
+        timestamp=now,
+        overnight_quote=SimpleNamespace(last_done=Decimal("95"), timestamp=now - timedelta(hours=8)),
+        pre_market_quote=None,
+        post_market_quote=None,
+    )
+    price, session = _extract_realtime_price(quote)
+    assert price == Decimal("100")
+    assert session == "regular"
+
+
+def test_extract_realtime_price_ignores_zero_or_none_last_done():
+    from datetime import datetime, timedelta
+    from longbridge2tg.longbridge_client import _extract_realtime_price
+
+    now = datetime.now()
+    quote = SimpleNamespace(
+        symbol="AAPL.US",
+        last_done=Decimal("100"),
+        timestamp=now - timedelta(hours=8),
+        overnight_quote=SimpleNamespace(last_done=Decimal("0"), timestamp=now),
+        pre_market_quote=SimpleNamespace(last_done=None, timestamp=now),
+        post_market_quote=None,
+    )
+    price, session = _extract_realtime_price(quote)
+    assert price == Decimal("100")
+    assert session == "regular"
+
+
+def test_extract_realtime_price_pre_market_and_post_market():
+    from datetime import datetime, timedelta
+    from longbridge2tg.longbridge_client import _extract_realtime_price
+
+    now = datetime.now()
+    quote = SimpleNamespace(
+        symbol="TSLA.US",
+        last_done=Decimal("200"),
+        timestamp=now - timedelta(hours=4),
+        pre_market_quote=SimpleNamespace(last_done=Decimal("205"), timestamp=now),
+        post_market_quote=SimpleNamespace(last_done=Decimal("202"), timestamp=now - timedelta(hours=2)),
+        overnight_quote=None,
+    )
+    price, session = _extract_realtime_price(quote)
+    assert price == Decimal("205")
+    assert session == "pre_market_quote"
+
