@@ -120,3 +120,68 @@ def test_long_report_keeps_complete_markdown_table_in_each_chunk():
 def test_visual_width_pads_cjk_and_latin_consistently():
     assert visual_width("特斯拉") == 6
     assert visual_width("TSLA") == 4
+
+
+def test_formats_total_leverage_for_standard_and_leveraged_positions():
+    # Net assets = 1,000,000, Cash = 500,000
+    # Holdings:
+    # NVDA (1x): 100 shares @ $1,000 = $100,000 -> exposure = $100,000
+    # TSLL (2x): 1,000 shares @ $200 = $200,000 -> exposure = $400,000
+    # TQQQ (3x): 2,000 shares @ $100 = $200,000 -> exposure = $600,000
+    # Gross exposure = 100k + 400k + 600k = 1,100,000
+    # Total leverage = 1,100,000 / 1,000,000 = 110.0%
+    positions = (
+        PositionRow("NVDA.US", "Nvidia", Decimal(100), Decimal(900), "USD"),
+        PositionRow("TSLL.US", "TSLL 2x", Decimal(1000), Decimal(180), "USD"),
+        PositionRow("TQQQ.US", "TQQQ 3x", Decimal(2000), Decimal(90), "USD"),
+    )
+    quotes = {
+        "NVDA.US": Decimal(1000),
+        "TSLL.US": Decimal(200),
+        "TQQQ.US": Decimal(100),
+    }
+    leverages = {
+        "TSLL": Decimal("2.0"),
+        "TQQQ": Decimal("3.0"),
+    }
+    snap = PortfolioSnapshot(
+        positions=positions,
+        securities={},
+        quotes=quotes,
+        balance=AccountSummary(Decimal("500000"), Decimal("1000000"), "USD"),
+        leverages=leverages,
+    )
+
+    messages = format_portfolio_snapshot(snap)
+
+    assert len(messages) == 1
+    assert "**持仓：50.0%**" in messages[0]
+    assert "**现金：50.0%**" in messages[0]
+    assert "**总杠杆：110.0%**" in messages[0]
+
+
+def test_formats_gross_leverage_adds_short_etf_positively():
+    # Net assets = 1,000,000, Cash = 700,000
+    # Holding SQQQ (3x short): 1,000 shares @ $300 = $300,000
+    # Gross exposure = 300,000 * 3.0 = 900,000
+    # Total leverage = 900,000 / 1,000,000 = 90.0%
+    positions = (
+        PositionRow("SQQQ.US", "ProShares UltraPro Short QQQ", Decimal(1000), Decimal(300), "USD"),
+    )
+    quotes = {"SQQQ.US": Decimal(300)}
+    leverages = {"SQQQ": Decimal("3.0")}
+    snap = PortfolioSnapshot(
+        positions=positions,
+        securities={},
+        quotes=quotes,
+        balance=AccountSummary(Decimal("700000"), Decimal("1000000"), "USD"),
+        leverages=leverages,
+    )
+
+    messages = format_portfolio_snapshot(snap)
+
+    assert len(messages) == 1
+    assert "**持仓：30.0%**" in messages[0]
+    assert "**现金：70.0%**" in messages[0]
+    assert "**总杠杆：90.0%**" in messages[0]
+

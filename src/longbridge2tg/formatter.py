@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Mapping
 from .models import PortfolioSnapshot
 
+
+logger = logging.getLogger(__name__)
 
 MESSAGE_LENGTH = 30000
 _TZ_CN = timezone(timedelta(hours=8))
@@ -22,6 +26,21 @@ class _DisplayPosition:
     profitable: int
 
 
+def _resolve_leverage(leverages: Mapping[str, Decimal | float] | None, code: str) -> Decimal:
+    if not leverages:
+        return Decimal(1)
+    val = leverages.get(code)
+    if val is None:
+        val = leverages.get(f"{code}.US")
+    if val is None:
+        return Decimal(1)
+    try:
+        dec = Decimal(str(val))
+        return dec if dec > 0 else Decimal(1)
+    except Exception:
+        return Decimal(1)
+
+
 def format_portfolio_snapshot(
     snapshot: PortfolioSnapshot,
     reported_at: datetime | None = None,
@@ -33,15 +52,28 @@ def format_portfolio_snapshot(
         raise ValueError("account net_assets must be positive")
 
     positions = _display_positions(snapshot)
-    holding_percentage = _percentage(
-        sum((position.market_value for position in positions), Decimal(0)),
-        snapshot.balance.net_assets,
-    )
+    total_market_value = sum((position.market_value for position in positions), Decimal(0))
+    holding_percentage = _percentage(total_market_value, snapshot.balance.net_assets)
     cash_percentage = _percentage(snapshot.balance.total_cash, snapshot.balance.net_assets)
+
+    gross_exposure = Decimal(0)
+    for position in positions:
+        lev = _resolve_leverage(snapshot.leverages, position.code)
+        gross_exposure += position.market_value * lev
+
+    leverage_percentage = _percentage(gross_exposure, snapshot.balance.net_assets)
+    logger.info(
+        "calculated portfolio leverage: gross_exposure=%s net_assets=%s leverage=%s",
+        gross_exposure,
+        snapshot.balance.net_assets,
+        _percent_text(leverage_percentage),
+    )
+
     summary = (
         "## 📊 账户仓位\n"
         f"**持仓：{_percent_text(holding_percentage)}**\n"
-        f"**现金：{_percent_text(cash_percentage)}**"
+        f"**现金：{_percent_text(cash_percentage)}**\n"
+        f"**总杠杆：{_percent_text(leverage_percentage)}**"
     )
     table_rows = _table_rows(positions)
     return _messages(summary, table_rows, reported_at, max_message_length)

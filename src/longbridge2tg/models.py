@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Mapping
 
@@ -27,3 +27,5 @@ class PortfolioSnapshot:
     securities: Mapping[str, str]
     quotes: Mapping[str, Decimal]
     balance: AccountSummary | None
+    leverages: Mapping[str, Decimal] = field(default_factory=dict)
+

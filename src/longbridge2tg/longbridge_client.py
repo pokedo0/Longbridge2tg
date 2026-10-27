@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
 from .config import LongbridgeConfig
+from .leveraged_etf import LeveragedETFService
 from .models import AccountSummary, PortfolioSnapshot, PositionRow
 
 
@@ -21,8 +22,13 @@ class PortfolioClient(Protocol):
 class LongbridgePositionsClient:
     """Adapter around the official SDK's read-only portfolio APIs."""
 
-    def __init__(self, config: LongbridgeConfig) -> None:
+    def __init__(
+        self,
+        config: LongbridgeConfig,
+        etf_service: LeveragedETFService | None = None,
+    ) -> None:
         self._config = config
+        self._etf_service = etf_service or LeveragedETFService()
         self._context: object | None = None
         self._quote_context: object | None = None
         self._start_lock = asyncio.Lock()
@@ -70,11 +76,20 @@ class LongbridgePositionsClient:
         logger.info("fetched account balance: entries=%d", len(balances))
         balance = _select_balance(balances, positions, target_currency="USD")
 
+        logger.info("resolving leverages for %d symbols", len(symbols))
+        leverages = await self._etf_service.get_leverages(symbols)
+        leveraged_items = {s: lev for s, lev in leverages.items() if lev != Decimal(1) and "." in s}
+        if leveraged_items:
+            logger.info("identified leveraged ETF positions: %s", leveraged_items)
+        else:
+            logger.info("no leveraged ETF positions found among current holdings")
+
         return PortfolioSnapshot(
             positions=tuple(positions),
             securities=static_names,
             quotes=quotes,
             balance=balance,
+            leverages=leverages,
         )
 
     async def _fetch_security_details(
